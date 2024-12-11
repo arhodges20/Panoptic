@@ -1,5 +1,6 @@
 # Panoptic
 Panoptic: Lightweight Endpoint Monitoring PoC 
+
 Panoptic is a proof of concept (PoC) for a lightweight, centralized endpoint monitoring solution inspired by the idea of a digital panopticon—a single-pane control tower for managing and securing an organization’s endpoints.
 Current Features in Progress
 
