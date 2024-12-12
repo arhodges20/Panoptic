@@ -57,8 +57,8 @@ start_server_in_tmux() {
     # Kill any existing session if it exists
     tmux kill-session -t $SESSION_NAME 2>/dev/null  # Ignore error if session doesn't exist
     
-    # Create new tmux session
-    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && echo 'tmux session created' && python3 server.py" || { 
+    # Start a new tmux session
+    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && echo 'Tmux session created' && python3 server.py; bash" || { 
         echo "Failed to start tmux session"; 
         exit 1; 
     }
