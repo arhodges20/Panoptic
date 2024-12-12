@@ -2,7 +2,7 @@
 
 # Define variables
 SERVER_REPO="git@github.com:arhodges20/panoptic.git"
-SERVER_DIR="panoptic"  # The directory where the repository will be cloned
+SERVER_DIR="panoptic/server"  # The directory where the repository will be cloned
 SESSION_NAME="panoptic_server"
 VENV_DIR="venv"  # Virtual environment will be created inside the server directory
 
@@ -15,12 +15,12 @@ install_dependencies() {
 
 # Clone or pull the repository
 clone_or_pull_repo() {
-    # Check if the repository already exists in the panoptic directory
+    # Check if the panoptic server directory exists
     if [ ! -d "$SERVER_DIR" ]; then
-        echo "Cloning the Panoptic repository..."
+        echo "Cloning the Panoptic repository into the server directory..."
         git clone $SERVER_REPO $SERVER_DIR
     else
-        echo "Repository already exists. Pulling the latest changes..."
+        echo "Repository already exists in $SERVER_DIR. Pulling the latest changes..."
         cd $SERVER_DIR
         git reset --hard
         git pull origin main
@@ -59,7 +59,7 @@ start_server_in_tmux() {
     tmux kill-session -t $SESSION_NAME 2>/dev/null  # Ignore error if session doesn't exist
     
     # Start a new tmux session
-    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && echo 'Tmux session created' && python3 server.py; bash" || { 
+    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && python3 server.py; bash" || { 
         echo "Failed to start tmux session"; 
         exit 1; 
     }
