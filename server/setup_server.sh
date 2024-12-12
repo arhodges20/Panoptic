@@ -32,6 +32,7 @@ clone_or_pull_repo() {
 create_and_activate_venv() {
     cd $SERVER_DIR  # Navigate to the server directory
     
+    # Check if the virtual environment exists, if not, create it
     if [ ! -d "$VENV_DIR" ]; then
         echo "Creating Python virtual environment..."
         python3 -m venv $VENV_DIR
@@ -44,11 +45,11 @@ create_and_activate_venv() {
     source $VENV_DIR/bin/activate
 }
 
-# Function to install Python dependencies
+# Function to install Python dependencies (like Flask)
 install_python_dependencies() {
     echo "Installing Python dependencies inside the virtual environment..."
     pip install --upgrade pip
-    pip install flask
+    pip install flask  # Install Flask
 }
 
 # Function to start the server in tmux
@@ -59,7 +60,7 @@ start_server_in_tmux() {
     tmux kill-session -t $SESSION_NAME 2>/dev/null  # Ignore error if session doesn't exist
     
     # Start a new tmux session
-    tmux new -d -s $SESSION_NAME "cd $SERVER_DIR/server && source $VENV_DIR/bin/activate && python3 server.py; bash" || { 
+    tmux new -d -s $SESSION_NAME "cd $SERVER_DIR/server && source $SERVER_DIR/server/venv/bin/activate && python3 server.py; bash" || { 
         echo "Failed to start tmux session"; 
         exit 1; 
     }
