@@ -2,7 +2,7 @@
 
 # Define variables
 SERVER_REPO="git@github.com:arhodges20/panoptic.git"
-SERVER_DIR="panoptic"  # The directory where the repository will be cloned
+SERVER_DIR="../panoptic"  # The relative path to the directory where the repository will be cloned
 SESSION_NAME="panoptic_server"
 VENV_DIR="venv"  # Virtual environment will be created inside the server directory
 
@@ -67,26 +67,12 @@ start_server_in_tmux() {
     echo "Tmux session started successfully"
 }
 
-# Function to configure the firewall
-configure_firewall() {
-    # Check if UFW is installed
-    if ! command -v ufw &> /dev/null
-    then
-        echo "UFW could not be found, installing..."
-        sudo apt install ufw -y
-    fi
-
-    echo "Configuring the firewall to allow traffic on port 5000..."
-    sudo ufw allow 5000
-}
-
 # Main script execution
 install_dependencies
 clone_or_pull_repo
 create_and_activate_venv
 install_python_dependencies
 start_server_in_tmux
-configure_firewall
 
 # Final status message
 echo "Server setup complete. Use 'tmux attach -t $SESSION_NAME' to monitor the server."
