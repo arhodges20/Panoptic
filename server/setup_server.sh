@@ -2,7 +2,7 @@
 
 # Define variables
 SERVER_REPO="git@github.com:arhodges20/panoptic.git"
-SERVER_DIR="../panoptic"  # The relative path to the directory where the repository will be cloned
+SERVER_DIR="/home/ahodges_admin/panoptic"  # Absolute path to the repository directory
 SESSION_NAME="panoptic_server"
 VENV_DIR="venv"  # Virtual environment will be created inside the server directory
 
@@ -59,7 +59,7 @@ start_server_in_tmux() {
     tmux kill-session -t $SESSION_NAME 2>/dev/null  # Ignore error if session doesn't exist
     
     # Start a new tmux session
-    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && cd $SERVER_DIR && python3 server.py; bash" || { 
+    tmux new -d -s $SESSION_NAME "cd $SERVER_DIR && source $VENV_DIR/bin/activate && python3 server.py; bash" || { 
         echo "Failed to start tmux session"; 
         exit 1; 
     }
