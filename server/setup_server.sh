@@ -2,7 +2,7 @@
 
 # Define variables
 SERVER_REPO="git@github.com:arhodges20/panoptic.git"
-SERVER_DIR="panoptic/server"  # The directory where the repository will be cloned
+SERVER_DIR="panoptic"  # The directory where the repository will be cloned
 SESSION_NAME="panoptic_server"
 VENV_DIR="venv"  # Virtual environment will be created inside the server directory
 
@@ -15,9 +15,9 @@ install_dependencies() {
 
 # Clone or pull the repository
 clone_or_pull_repo() {
-    # Check if the panoptic server directory exists
+    # Check if the panoptic directory exists
     if [ ! -d "$SERVER_DIR" ]; then
-        echo "Cloning the Panoptic repository into the server directory..."
+        echo "Cloning the Panoptic repository into the panoptic directory..."
         git clone $SERVER_REPO $SERVER_DIR
     else
         echo "Repository already exists in $SERVER_DIR. Pulling the latest changes..."
