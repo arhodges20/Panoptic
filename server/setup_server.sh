@@ -15,6 +15,7 @@ install_dependencies() {
 
 # Clone or pull the repository
 clone_or_pull_repo() {
+    # Check if the repository already exists in the panoptic directory
     if [ ! -d "$SERVER_DIR" ]; then
         echo "Cloning the Panoptic repository..."
         git clone $SERVER_REPO $SERVER_DIR
