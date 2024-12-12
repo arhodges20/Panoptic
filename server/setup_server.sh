@@ -32,7 +32,7 @@ clone_or_pull_repo() {
 create_and_activate_venv() {
     cd $SERVER_DIR  # Navigate to the server directory
 
-    # Check if the virtual environment exists and if not, create it
+    # Remove and recreate the venv if it is missing or corrupted
     if [ ! -d "$VENV_DIR" ] || [ ! -d "$VENV_DIR/bin" ]; then
         echo "Virtual environment not found or corrupted. Recreating virtual environment..."
         rm -rf $VENV_DIR  # Remove any incomplete venv
