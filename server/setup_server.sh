@@ -15,8 +15,6 @@ install_dependencies() {
 
 # Clone or pull the repository
 clone_or_pull_repo() {
-    cd ..  # Go up one directory
-
     if [ ! -d "$SERVER_DIR" ]; then
         echo "Cloning the Panoptic repository..."
         git clone $SERVER_REPO $SERVER_DIR
@@ -55,19 +53,33 @@ install_python_dependencies() {
 # Function to start the server in tmux
 start_server_in_tmux() {
     echo "Starting the server in a tmux session..."
-    tmux kill-session -t $SESSION_NAME 2>/dev/null  # Kill any existing session
-    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && python3 server.py" || { echo "Failed to start tmux session"; exit 1; }
+    
+    # Kill any existing session if it exists
+    tmux kill-session -t $SESSION_NAME 2>/dev/null  # Ignore error if session doesn't exist
+    
+    # Create new tmux session
+    tmux new -d -s $SESSION_NAME "source $VENV_DIR/bin/activate && echo 'tmux session created' && python3 server.py" || { 
+        echo "Failed to start tmux session"; 
+        exit 1; 
+    }
+    
     echo "Tmux session started successfully"
 }
 
 # Function to configure the firewall
 configure_firewall() {
+    # Check if UFW is installed
+    if ! command -v ufw &> /dev/null
+    then
+        echo "UFW could not be found, installing..."
+        sudo apt install ufw -y
+    fi
+
     echo "Configuring the firewall to allow traffic on port 5000..."
     sudo ufw allow 5000
 }
 
 # Main script execution
-
 install_dependencies
 clone_or_pull_repo
 create_and_activate_venv
