@@ -2,7 +2,7 @@
 
 # Define variables
 SERVER_REPO="git@github.com:arhodges20/panoptic.git"
-SERVER_DIR="panoptic"  # The directory where the repository will be cloned
+SERVER_DIR="../panoptic"  # The relative path to the directory where the repository will be cloned
 SESSION_NAME="panoptic_server"
 VENV_DIR="venv"  # Virtual environment will be created inside the server directory
 
