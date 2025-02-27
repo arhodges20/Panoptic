@@ -13,8 +13,7 @@
             insert_log("new_processes", ["ip", "pid", "name", "user"], [client_ip, process["pid"], process["name"], process["u>
 
     # Store privileged processes
-    if "privileged_processes" in data and data["privileged_processes"]:
-        for process in data["privileged_processes"]:
+    if "privileged_processes" in data and data["privileged_processes"]:                                                                for process in data["privileged_processes"]:
             logging.warning(f"⚠ PRIVILEGED PROCESS DETECTED: {process}")
             insert_log("privileged_processes", ["ip", "pid", "name", "user"], [client_ip, process["pid"], process["name"], pro>
 
