@@ -1,35 +1,24 @@
-import psutil
-import requests
-import time
+        payload.update(stats)
+    if processes:
+        payload["new_processes"] = processes
+    if privileged_processes:
+        payload["privileged_processes"] = privileged_processes
 
-# Centralized server configuration
-SERVER_URL = "http://10.10.50.4:5000/stats"  # Replace with your centralized server's IP and port
-
-def collect_stats():
-    """
-    Collect system stats such as CPU and memory usage.
-    """
-    return {
-        "cpu": psutil.cpu_percent(interval=1),  # Collect CPU usage over a 1-second interval
-        "memory": psutil.virtual_memory().percent  # Collect memory usage percentage
-    }
-
-def send_stats():
-    """
-    Send system stats to the centralized server in a loop.
-    """
-    while True:
-        stats = collect_stats()
+    if payload:
         try:
-            response = requests.post(SERVER_URL, json=stats)
+            response = requests.post(SERVER_URL, json=payload, timeout=5)
             if response.status_code == 200:
-                print(f"Successfully sent stats: {stats}")
+                logging.info(f"Sent data: {payload}")
             else:
-                print(f"Failed to send stats. Server responded with status code: {response.status_code}")
-        except Exception as e:
-            print(f"Error sending stats: {e}")
-        time.sleep(10)  # Send stats every 10 seconds
+                logging.warning(f"Failed to send data: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error sending data: {e}")
 
 if __name__ == "__main__":
-    print(f"Starting agent to send stats to {SERVER_URL}")
-    send_stats()
+    logging.info("Panoptic Agent started (privileged process monitoring enabled)")
+
+    while True:
+        stats = collect_stats()
+        new_procs, privileged_procs = detect_new_processes()
+        send_data(stats, new_procs, privileged_procs)
+        time.sleep(2)  # Check every 2 seconds for new processes
