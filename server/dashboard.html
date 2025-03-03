@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panoptic Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .tabs button { margin-right: 10px; padding: 10px; cursor: pointer; }
+        .content { display: none; }
+        .active { display: block; }
+        th, td { padding: 10px; border: 1px solid black; }
+    </style>
+</head>
+<body>
+    <h1>Panoptic Dashboard</h1>
+
+    <!-- Tabs for switching between tables -->
+    <div class="tabs">
+        <button onclick="showTab('system')">System Stats</button>
+        <button onclick="showTab('new')">New Processes</button>
+        <button onclick="showTab('privileged')">Privileged Processes</button>
+    </div>
+
+    <!-- System Stats Table -->
+    <div id="system" class="content active">
+        <h2>System Stats</h2>
+        <table>
+            <tr><th>Timestamp</th><th>IP</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th></tr>
+            <tbody id="system-table-body"></tbody>
+        </table>
+    </div>
+
+    <!-- New Processes Table -->
+    <div id="new" class="content">
+        <h2>New Processes</h2>
+        <table>
+            <tr><th>Timestamp</th><th>IP</th><th>PID</th><th>Name</th><th>User</th></tr>
+            <tbody id="new-table-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Privileged Processes Table -->
+    <div id="privileged" class="content">
+        <h2>Privileged Processes</h2>
+        <table>
+            <tr><th>Timestamp</th><th>IP</th><th>PID</th><th>Name</th><th>User</th></tr>
+            <tbody id="privileged-table-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        function fetchStats(endpoint, tableId) {
+            fetch(endpoint)
+                .then(response => response.json())
+                .then(data => {
+                    let tableBody = document.getElementById(tableId);
+                    tableBody.innerHTML = ""; // Clear previous data
+
+                    data.forEach(entry => {
+                        let row = `<tr>
+                            <td>${entry.timestamp}</td>
+                            <td>${entry.ip}</td>
+                            ${entry.cpu !== undefined ? `<td>${entry.cpu}</td><td>${entry.memory}</td>` : ""}
+                            ${entry.pid !== undefined ? `<td>${entry.pid}</td><td>${entry.name}</td><td>${entry.user}</td>` : ""}
+                        </tr>`;
+                        tableBody.innerHTML += row;
+                    });
+                })
+                .catch(error => console.error("Error fetching data:", error));
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+        }
+
+        // Refresh data every 5 seconds
+        setInterval(() => {
+            fetchStats('/api/system_stats', 'system-table-body');
+            fetchStats('/api/new_processes', 'new-table-body');
+            fetchStats('/api/privileged_processes', 'privileged-table-body');
+        }, 5000);
+
+        // Initial data load
+        fetchStats('/api/system_stats', 'system-table-body');
+        fetchStats('/api/new_processes', 'new-table-body');
+        fetchStats('/api/privileged_processes', 'privileged-table-body');
+    </script>
+</body>
+</html>
