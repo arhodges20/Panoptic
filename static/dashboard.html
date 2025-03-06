@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panoptic Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1b26;
+            --bg-secondary: #24283b;
+            --text-primary: #a9b1d6;
+            --text-secondary: #565f89;
+            --accent: #bb9af7;
+            --danger: #f7768e;
+            --success: #9ece6a;
+            --info: #7dcfff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: var(--accent);
+            margin-bottom: 20px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-tab.active {
+            background-color: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .time-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            background-color: var(--bg-secondary);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .time-btn {
+            padding: 8px 16px;
+            background: none;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .time-btn.active {
+            background-color: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        .refresh-btn {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background-color: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .graphs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .graph-container {
+            background-color: var(--bg-secondary);
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .data-table {
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--bg-primary);
+        }
+
+        th {
+            background-color: rgba(187, 154, 247, 0.1);
+            color: var(--accent);
+        }
+
+        tr:hover {
+            background-color: rgba(187, 154, 247, 0.05);
+        }
+
+        .danger {
+            color: var(--danger);
+        }
+
+        .success {
+            color: var(--success);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .process-table {
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Panoptic Dashboard</h1>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="system-stats">🌐 System Stats</button>
+                <button class="nav-tab" data-tab="new-processes">🔄 New Processes</button>
+                <button class="nav-tab" data-tab="privileged-processes">🛡️ Privileged Processes</button>
+            </div>
+        </header>
+
+        <div class="time-controls">
+            <button class="time-btn active" data-range="24h">Last 24h</button>
+            <button class="time-btn" data-range="7d">Last 7d</button>
+            <button class="time-btn" data-range="30d">Last 30d</button>
+            <span id="time-range"></span>
+            <button class="refresh-btn">
+                🔄 Refresh Data
+            </button>
+        </div>
+
+        <div id="system-stats" class="tab-content active">
+            <div class="graphs">
+                <div class="graph-container">
+                    <div id="cpuChart"></div>
+                </div>
+                <div class="graph-container">
+                    <div id="memoryChart"></div>
+                </div>
+            </div>
+
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp ↓</th>
+                            <th>IP</th>
+                            <th>CPU Usage (%)</th>
+                            <th>Memory Usage (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statsTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="new-processes" class="tab-content">
+            <div class="process-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp ↓</th>
+                            <th>IP</th>
+                            <th>PID</th>
+                            <th>Process Name</th>
+                            <th>User</th>
+                        </tr>
+                    </thead>
+                    <tbody id="newProcessesTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="privileged-processes" class="tab-content">
+            <div class="process-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp ↓</th>
+                            <th>IP</th>
+                            <th>PID</th>
+                            <th>Process Name</th>
+                            <th>User</th>
+                        </tr>
+                    </thead>
+                    <tbody id="privilegedProcessesTable">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Utility functions
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleString();
+        }
+
+        function getTimeRange() {
+            const now = new Date();
+            const activeTimeBtn = document.querySelector('.time-btn.active');
+            let start = new Date();
+
+            switch (activeTimeBtn.dataset.range) {
+                case '24h':
+                    start = new Date(now - 24 * 60 * 60 * 1000);
+                    break;
+                case '7d':
+                    start = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case '30d':
+                    start = new Date(now - 30 * 24 * 60 * 60 * 1000);
+                    break;
+            }
+
+            return {
+                start: start.toISOString(),
+                end: now.toISOString()
+            };
+        }
+
+        function updateTimeRange() {
+            const range = getTimeRange();
+            const start = new Date(range.start).toLocaleString();
+            const end = new Date(range.end).toLocaleString();
+            document.getElementById('time-range').textContent = `${start} to ${end}`;
+        }
+
+        // Data fetching
+        async function fetchSystemStats() {
+            try {
+                const range = getTimeRange();
+                const response = await fetch(`/api/system_stats?start=${range.start}&end=${range.end}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching system stats:', error);
+                return [];
+            }
+        }
+
+        async function fetchNewProcesses() {
+            try {
+                const range = getTimeRange();
+                const response = await fetch(`/api/new_processes?start=${range.start}&end=${range.end}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching new processes:', error);
+                return [];
+            }
+        }
+
+        async function fetchPrivilegedProcesses() {
+            try {
+                const range = getTimeRange();
+                const response = await fetch(`/api/privileged_processes?start=${range.start}&end=${range.end}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching privileged processes:', error);
+                return [];
+            }
+        }
+
+        // Chart creation
+        function createCharts(data) {
+            const timestamps = data.map(d => d.timestamp);
+            const cpuData = data.map(d => d.cpu);
+            const memoryData = data.map(d => d.memory);
+
+            const cpuTrace = {
+                x: timestamps.reverse(),  // Reverse to show oldest to newest
+                y: cpuData.reverse(),
+                type: 'scatter',
+                fill: 'tozeroy',
+                name: 'CPU Usage',
+                line: { color: '#bb9af7' }
+            };
+
+            const memoryTrace = {
+                x: timestamps,
+                y: memoryData,
+                type: 'scatter',
+                fill: 'tozeroy',
+                name: 'Memory Usage',
+                line: { color: '#7dcfff' }
+            };
+
+            const layout = {
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#a9b1d6' },
+                margin: { t: 30, r: 30, b: 30, l: 30 },
+                xaxis: {
+                    gridcolor: '#24283b',
+                    zerolinecolor: '#24283b',
+                    type: 'date',
+                    tickformat: '%H:%M:%S\n%Y-%m-%d'
+                },
+                yaxis: {
+                    gridcolor: '#24283b',
+                    zerolinecolor: '#24283b',
+                    range: [0, 100]
+                }
+            };
+
+            Plotly.newPlot('cpuChart', [cpuTrace], {
+                ...layout,
+                title: 'CPU Usage'
+            });
+
+            Plotly.newPlot('memoryChart', [memoryTrace], {
+                ...layout,
+                title: 'Memory Usage'
+            });
+        }
+
+        // Table updates
+        function updateSystemStatsTable(data) {
+            const tbody = document.getElementById('statsTable');
+            tbody.innerHTML = '';
+
+            // Sort data by timestamp in descending order
+            const sortedData = [...data].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            sortedData.slice(0, 10).forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDate(row.timestamp)}</td>
+                    <td>${row.ip}</td>
+                    <td class="${row.cpu > 80 ? 'danger' : ''}">${row.cpu.toFixed(1)}%</td>
+                    <td class="${row.memory > 80 ? 'danger' : ''}">${row.memory.toFixed(1)}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateProcessTable(tableId, data) {
+            const tbody = document.getElementById(tableId);
+            tbody.innerHTML = '';
+
+            // Sort data by timestamp in descending order
+            const sortedData = [...data].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            sortedData.slice(0, 10).forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${formatDate(row.timestamp)}</td>
+                    <td>${row.ip}</td>
+                    <td>${row.pid}</td>
+                    <td>${row.name}</td>
+                    <td>${row.user}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Tab switching
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Add active class to selected tab
+            document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+        }
+
+        // Initialize dashboard
+        async function initDashboard() {
+            updateTimeRange();
+            await refreshData();
+        }
+
+        // Refresh data based on current tab and time range
+        async function refreshData() {
+            const loadingText = '🔄 Refreshing...';
+            const refreshBtn = document.querySelector('.refresh-btn');
+            const originalText = refreshBtn.textContent;
+            refreshBtn.textContent = loadingText;
+            refreshBtn.disabled = true;
+
+            try {
+                // Get active tab
+                const activeTab = document.querySelector('.nav-tab.active').dataset.tab;
+                
+                // Fetch and update data based on active tab
+                switch (activeTab) {
+                    case 'system-stats':
+                        const statsData = await fetchSystemStats();
+                        createCharts(statsData);
+                        updateSystemStatsTable(statsData);
+                        break;
+                    case 'new-processes':
+                        const newProcesses = await fetchNewProcesses();
+                        updateProcessTable('newProcessesTable', newProcesses);
+                        break;
+                    case 'privileged-processes':
+                        const privProcesses = await fetchPrivilegedProcesses();
+                        updateProcessTable('privilegedProcessesTable', privProcesses);
+                        break;
+                }
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+            } finally {
+                refreshBtn.textContent = originalText;
+                refreshBtn.disabled = false;
+            }
+        }
+
+        // Event listeners
+        document.querySelector('.refresh-btn').addEventListener('click', refreshData);
+        
+        // Add tab switching listeners
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const tabId = e.target.dataset.tab;
+                switchTab(tabId);
+                refreshData();
+            });
+        });
+
+        // Add time range button listeners
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // Remove active class from all time buttons
+                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                e.target.classList.add('active');
+                // Refresh dashboard with new time range
+                refreshData();
+            });
+        });
+
+        // Initial load
+        initDashboard();
+    </script>
+</body>
+</html> 
