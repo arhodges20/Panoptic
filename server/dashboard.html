@@ -1,91 +1,994 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full bg-gray-900">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panoptic Dashboard</title>
+    <!-- Favicon -->
+    <link rel="icon" href="favicon.ico" type="image/ico">
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'theme': {
+                            100: '#f3e8ff',
+                            200: '#e9d5ff',
+                            300: '#d8b4fe',
+                            400: '#c084fc',
+                            500: '#a855f7',
+                            600: '#9333ea',
+                            700: '#7e22ce',
+                            800: '#6b21a8',
+                            900: '#581c87'
+                        }
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- AG Grid -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@30.0.2/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@30.0.2/styles/ag-theme-alpine-dark.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <!-- Suppress Chart.js source map warning -->
+    <script>
+        localStorage.setItem('devtools-source-maps', 'false');
+    </script>
+
     <style>
-        body { font-family: Arial, sans-serif; }
-        .tabs button { margin-right: 10px; padding: 10px; cursor: pointer; }
-        .content { display: none; }
-        .active { display: block; }
-        th, td { padding: 10px; border: 1px solid black; }
+        /* Navigation menu - Consolidated styles */
+        .nav-menu {
+            @apply flex mb-8 bg-gray-800/30 p-3 rounded-lg border border-gray-700/30 backdrop-blur-sm
+            relative overflow-x-auto gap-4 scroll-smooth;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .nav-menu::-webkit-scrollbar {
+            display: none;
+        }
+
+        .nav-button {
+            @apply px-6 py-3.5 text-gray-300 rounded-lg 
+            flex items-center gap-3 relative min-w-[160px]
+            text-sm font-medium whitespace-nowrap
+            transition-all duration-200 ease-in-out
+            hover:text-white hover:bg-theme-500/10
+            focus:outline-none focus:ring-2 focus:ring-theme-500/30;
+        }
+
+        .nav-button::after {
+            @apply content-[''] absolute bottom-0 left-0 right-0 h-0.5
+            bg-theme-400 transform scale-x-0 origin-left
+            transition-transform duration-200 ease-in-out;
+        }
+
+        .nav-button:hover::after {
+            @apply scale-x-100;
+        }
+
+        .nav-button.active {
+            @apply text-white bg-theme-500/15 shadow-lg shadow-theme-500/10;
+        }
+
+        .nav-button.active::after {
+            @apply scale-x-100;
+        }
+
+        .nav-button.active::before {
+            @apply content-[''] absolute inset-0 rounded-lg 
+            bg-gradient-to-b from-theme-500/10 to-theme-400/5
+            pointer-events-none opacity-50;
+        }
+
+        .nav-button i {
+            @apply text-base transition-transform duration-200 relative z-10;
+        }
+
+        .nav-button:hover i {
+            @apply scale-110 text-theme-300;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .nav-menu {
+                @apply p-2 gap-2;
+                scroll-snap-type: x mandatory;
+            }
+            
+            .nav-button {
+                @apply px-5 py-3 text-xs gap-2.5 min-w-[140px];
+                scroll-snap-align: center;
+            }
+        }
+
+        /* Touch device optimizations - Consolidated */
+        @media (hover: none) {
+            .nav-button {
+                @apply py-4 active:bg-theme-500/20 active:text-white;
+            }
+            
+            .nav-button:hover::after {
+                @apply scale-x-0;
+            }
+        }
+
+        /* Scroll indicators - Optimized */
+        .nav-menu::before,
+        .nav-menu::after {
+            @apply content-[''] absolute top-0 bottom-0 w-8 
+            opacity-0 transition-opacity duration-200 pointer-events-none;
+        }
+
+        .nav-menu::before {
+            @apply left-0 bg-gradient-to-r from-gray-900 to-transparent;
+        }
+
+        .nav-menu::after {
+            @apply right-0 bg-gradient-to-l from-gray-900 to-transparent;
+        }
+
+        .nav-menu.scroll-start::before,
+        .nav-menu.scroll-end::after {
+            @apply opacity-100;
+        }
+
+        /* Chart and Grid Styles - Consolidated */
+        .chart-container {
+            @apply bg-gray-800/50 rounded-lg p-6 shadow-lg border border-gray-700/30 backdrop-blur-sm
+            relative overflow-hidden;
+        }
+
+        .chart-container::before {
+            @apply content-[''] absolute inset-0 bg-gradient-to-br from-theme-500/5 to-transparent pointer-events-none;
+        }
+
+        .chart-container h3 {
+            @apply text-lg font-semibold mb-4 text-theme-300 relative z-10;
+        }
+
+        .chart-empty {
+            @apply absolute inset-0 flex items-center justify-center bg-gray-800/90 z-20
+            text-gray-400 text-sm font-medium gap-2;
+        }
+
+        .chart-empty i {
+            @apply text-theme-400 text-lg;
+        }
+
+        /* Grid Styles - Optimized */
+        .ag-theme-alpine-dark {
+            --ag-background-color: rgb(17, 24, 39);
+            --ag-odd-row-background-color: rgba(55, 65, 81, 0.3);
+            --ag-header-background-color: rgb(31, 41, 55);
+            --ag-row-hover-color: rgba(139, 92, 246, 0.1);
+            --ag-selected-row-background-color: rgba(139, 92, 246, 0.2);
+            --ag-row-border-color: rgba(75, 85, 99, 0.3);
+            --ag-cell-horizontal-padding: 1rem;
+        }
+
+        /* Button Styles - Consolidated */
+        .btn-primary {
+            @apply px-5 py-2.5 bg-gradient-to-r from-theme-600 to-theme-500 
+            text-white rounded-lg text-sm font-medium shadow-lg 
+            transition-all duration-300 ease-in-out gap-2.5
+            focus:outline-none focus:ring-2 focus:ring-theme-500/50 focus:ring-offset-2 focus:ring-offset-gray-900
+            disabled:opacity-60 disabled:cursor-not-allowed;
+        }
+
+        .btn-primary:not(:disabled) {
+            @apply hover:from-theme-700 hover:to-theme-600 
+            hover:shadow-theme-500/20 hover:scale-105;
+        }
+
+        .btn-primary i {
+            @apply transition-transform duration-300;
+        }
+
+        .btn-primary:not(:disabled):hover i {
+            @apply rotate-180;
+        }
+
+        .btn-primary.loading {
+            @apply cursor-wait;
+        }
+
+        .btn-primary.loading i {
+            @apply animate-spin;
+        }
+
+        .btn-secondary {
+            @apply px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md text-sm font-medium 
+            transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500;
+        }
+
+        .chart-container {
+            @apply bg-gray-800/50 rounded-lg p-6 shadow-lg border border-gray-700/30 backdrop-blur-sm
+            relative overflow-hidden;
+        }
+
+        .chart-container::before {
+            content: '';
+            @apply absolute inset-0 bg-gradient-to-br from-theme-500/5 to-transparent pointer-events-none;
+        }
+
+        .chart-container h3 {
+            @apply relative z-10;
+        }
+
+        .chart-empty {
+            @apply absolute inset-0 flex items-center justify-center bg-gray-800/90 z-20
+            text-gray-400 text-sm font-medium;
+        }
+
+        .chart-empty i {
+            @apply text-theme-400 text-lg mr-2;
+        }
+
+        .custom-checkbox {
+            @apply h-4 w-4 rounded bg-gray-800/50 border-gray-700/50
+            text-theme-500 focus:ring-2 focus:ring-theme-500/50 focus:ring-offset-1 focus:ring-offset-gray-900
+            hover:border-theme-400 transition-colors duration-200;
+        }
+
+        .custom-select {
+            @apply bg-[#222222] border border-gray-700 text-gray-100 rounded-lg px-3 py-2 text-sm 
+            hover:border-theme-400 hover:bg-[#2A2A2A]
+            focus:border-theme-500 focus:ring-2 focus:ring-theme-500/30
+            disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-[#222222] disabled:text-gray-400
+            transition-all duration-200 ease-in-out
+            focus:outline-none
+            appearance-none cursor-pointer min-w-[80px];
+        }
+
+        /* Custom select arrow */
+        .select-wrapper {
+            @apply relative inline-block;
+        }
+
+        .select-wrapper::after {
+            content: '\f107';
+            font-family: 'Font Awesome 5 Free';
+            font-weight: 900;
+            @apply absolute right-3 top-1/2 -translate-y-1/2 text-theme-400 pointer-events-none 
+            transition-transform duration-200;
+        }
+
+        .select-wrapper:hover::after {
+            @apply text-theme-300 transform translate-y-[1px];
+        }
+
+        .select-wrapper:has(.custom-select:disabled)::after {
+            @apply text-gray-500;
+        }
+
+        /* Style for dropdown options */
+        .custom-select option {
+            @apply bg-[#222222] text-gray-100 py-1.5 px-2;
+        }
+
+        /* Auto-refresh group styling */
+        .auto-refresh-group {
+            @apply flex items-center gap-4 bg-gray-800/50 backdrop-blur-sm rounded-lg px-4 py-2.5 
+            border border-gray-700/50 shadow-sm;
+        }
+
+        .auto-refresh-label {
+            @apply text-sm text-gray-200 font-medium select-none whitespace-nowrap;
+        }
+
+        /* Custom Flatpickr Dark Theme Overrides */
+        .flatpickr-calendar,
+        .flatpickr-calendar.dark {
+            @apply bg-gray-800 border border-gray-700/50 shadow-xl;
+            width: auto !important;
+            min-width: 280px;
+            background: #1f2937 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-months .flatpickr-month,
+        .flatpickr-calendar.dark .flatpickr-weekdays,
+        .flatpickr-calendar.dark .flatpickr-weekday,
+        .flatpickr-calendar.dark .dayContainer {
+            background: #1f2937 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-monthDropdown-months,
+        .flatpickr-calendar.dark .flatpickr-current-month .flatpickr-monthDropdown-months,
+        .flatpickr-calendar.dark .flatpickr-current-month input.cur-year {
+            @apply bg-gray-800 text-gray-100;
+            background: #1f2937 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-months .flatpickr-prev-month svg,
+        .flatpickr-calendar.dark .flatpickr-months .flatpickr-next-month svg {
+            fill: #c084fc !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-day {
+            @apply text-gray-300;
+            background: #1f2937 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-day:hover {
+            @apply bg-theme-500/20 border-theme-500/50;
+            background: rgba(168, 85, 247, 0.2) !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-day.selected {
+            @apply text-white;
+            background: rgba(168, 85, 247, 0.4) !important;
+            border-color: #a855f7 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-day.today {
+            @apply border-theme-400/50 text-theme-300;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-time {
+            @apply border-t border-gray-700/50;
+            background: #1f2937 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-time input,
+        .flatpickr-calendar.dark .flatpickr-time .flatpickr-time-separator,
+        .flatpickr-calendar.dark .flatpickr-time .flatpickr-am-pm {
+            @apply text-gray-100;
+            background: #1f2937 !important;
+        }
+
+        .flatpickr-calendar.dark .flatpickr-time input:hover,
+        .flatpickr-calendar.dark .flatpickr-time .flatpickr-am-pm:hover {
+            background: rgba(168, 85, 247, 0.2) !important;
+        }
+
+        /* Enhanced DateTime Input Styling */
+        .datetime-input,
+        .flatpickr-input,
+        .flatpickr-input.flatpickr-input-alt {
+            @apply bg-gray-800/80 text-gray-100 border border-gray-700/50 rounded-lg px-4 py-2.5
+            hover:bg-gray-800 focus:bg-gray-800
+            transition-all duration-200 ease-in-out
+            placeholder-gray-400
+            text-sm font-medium
+            w-[220px]
+            focus:outline-none focus:ring-2 focus:ring-theme-400/50 focus:border-theme-400
+            hover:border-theme-400/50
+            shadow-sm;
+            background: rgb(31 41 55 / 0.8) !important;
+        }
+
+        .datetime-input.has-value,
+        .flatpickr-input.has-value,
+        .flatpickr-input.flatpickr-input-alt.has-value {
+            @apply border-theme-400/50 ring-1 ring-theme-500/20 bg-gray-800/90;
+            background: rgb(31 41 55 / 0.9) !important;
+        }
+
+        /* Hide the original input */
+        .flatpickr-input[type="text"] {
+            @apply hidden;
+        }
+
+        /* Override any default Flatpickr background colors */
+        .flatpickr-input:not([type="hidden"]),
+        .flatpickr-input.flatpickr-input-alt,
+        .flatpickr-mobile {
+            background: #1f2937 !important;
+        }
+
+        /* Ensure proper background on focus/hover states */
+        .flatpickr-input:focus,
+        .flatpickr-input:hover,
+        .flatpickr-input.flatpickr-input-alt:focus,
+        .flatpickr-input.flatpickr-input-alt:hover {
+            background: #374151 !important;
+        }
+
+        .datetime-input-group {
+            @apply flex items-center gap-4 bg-gray-800/30 backdrop-blur-sm rounded-lg p-3
+            border border-gray-700/30 shadow-sm
+            overflow-x-auto sm:overflow-visible;
+        }
+
+        .datetime-input-group .separator {
+            @apply text-gray-400 font-medium px-1;
+        }
     </style>
 </head>
-<body>
-    <h1>Panoptic Dashboard</h1>
+<body class="h-full font-sans">
+    <!-- Main Content -->
+    <div class="p-8 bg-gray-900 text-white min-h-screen">
+        <div class="max-w-7xl mx-auto">
+            <h1 class="text-3xl font-bold mb-8 bg-clip-text text-transparent bg-gradient-to-r from-theme-400 to-theme-600">
+                Panoptic Dashboard
+            </h1>
 
-    <!-- Tabs for switching between tables -->
-    <div class="tabs">
-        <button onclick="showTab('system')">System Stats</button>
-        <button onclick="showTab('new')">New Processes</button>
-        <button onclick="showTab('privileged')">Privileged Processes</button>
-    </div>
+            <!-- Navigation Menu -->
+            <div class="nav-menu">
+                <button id="system-tab" class="nav-button active" onclick="showTab('system')">
+                    <i class="fas fa-microchip"></i>
+                    <span>System Stats</span>
+                </button>
+                
+                <button id="new-tab" class="nav-button" onclick="showTab('new')">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>New Processes</span>
+                </button>
+                
+                <button id="privileged-tab" class="nav-button" onclick="showTab('privileged')">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Privileged Processes</span>
+                </button>
+            </div>
 
-    <!-- System Stats Table -->
-    <div id="system" class="content active">
-        <h2>System Stats</h2>
-        <table>
-            <tr><th>Timestamp</th><th>IP</th><th>CPU Usage (%)</th><th>Memory Usage (%)</th></tr>
-            <tbody id="system-table-body"></tbody>
-        </table>
-    </div>
+            <!-- Controls Section -->
+            <div class="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 mb-8 shadow-lg border border-gray-700">
+                <div class="flex flex-wrap items-center gap-6">
+                    <!-- Time Range Presets -->
+                    <div class="flex gap-2">
+                        <button onclick="setTimeRange('24h')" class="btn-secondary">Last 24h</button>
+                        <button onclick="setTimeRange('7d')" class="btn-secondary">Last 7d</button>
+                        <button onclick="setTimeRange('30d')" class="btn-secondary">Last 30d</button>
+                    </div>
 
-    <!-- New Processes Table -->
-    <div id="new" class="content">
-        <h2>New Processes</h2>
-        <table>
-            <tr><th>Timestamp</th><th>IP</th><th>PID</th><th>Name</th><th>User</th></tr>
-            <tbody id="new-table-body"></tbody>
-        </table>
-    </div>
+                    <!-- Custom Date Range -->
+                    <div class="datetime-input-group">
+                        <input type="text" id="startTime" placeholder="Select start date & time" class="datetime-input">
+                        <span class="separator">to</span>
+                        <input type="text" id="endTime" placeholder="Select end date & time" class="datetime-input">
+                    </div>
 
-    <!-- Privileged Processes Table -->
-    <div id="privileged" class="content">
-        <h2>Privileged Processes</h2>
-        <table>
-            <tr><th>Timestamp</th><th>IP</th><th>PID</th><th>Name</th><th>User</th></tr>
-            <tbody id="privileged-table-body"></tbody>
-        </table>
+                    <!-- Refresh Controls -->
+                    <div class="flex items-center gap-6 ml-auto">
+                        <button id="refreshBtn" onclick="refreshAllData()" class="btn-primary">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Refresh Data</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Sections -->
+            <div id="system" class="content space-y-8">
+                <!-- Charts Grid -->
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="chart-container">
+                        <h3 class="text-lg font-semibold mb-4 text-theme-300">CPU Usage</h3>
+                        <div class="relative h-[300px]">
+                            <canvas id="cpuChart"></canvas>
+                            <div class="chart-empty hidden">
+                                <i class="fas fa-chart-line"></i>
+                                <span>No data available</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <h3 class="text-lg font-semibold mb-4 text-theme-300">Memory Usage</h3>
+                        <div class="relative h-[300px]">
+                            <canvas id="memoryChart"></canvas>
+                            <div class="chart-empty hidden">
+                                <i class="fas fa-chart-line"></i>
+                                <span>No data available</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- System Stats Grid -->
+                <div class="bg-gray-800/50 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+                    <div id="systemGrid" class="ag-theme-alpine-dark w-full h-[500px]"></div>
+                </div>
+            </div>
+
+            <div id="new" class="content hidden space-y-8">
+                <div class="bg-gray-800/50 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+                    <div id="newProcessesGrid" class="ag-theme-alpine-dark w-full h-[600px]"></div>
+                </div>
+            </div>
+
+            <div id="privileged" class="content hidden space-y-8">
+                <div class="bg-gray-800/50 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700 overflow-hidden">
+                    <div id="privilegedGrid" class="ag-theme-alpine-dark w-full h-[600px]"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        function fetchStats(endpoint, tableId) {
-            fetch(endpoint)
-                .then(response => response.json())
-                .then(data => {
-                    let tableBody = document.getElementById(tableId);
-                    tableBody.innerHTML = ""; // Clear previous data
+        // Update Flatpickr initialization with custom theme
+        const flatpickrConfig = {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            theme: "dark",
+            position: "auto",
+            time_24hr: true,
+            minuteIncrement: 1,
+            allowInput: true,
+            altInput: true,
+            altFormat: "YYYY-MM-DD HH:mm",
+            disableMobile: true, // Prevent mobile devices from using native date picker
+            parseDate: (datestr, format) => {
+                return new Date(datestr);
+            },
+            formatDate: (date, format) => {
+                // Custom format function to ensure consistent date formatting
+                const pad = (num) => num.toString().padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            },
+            onReady: (selectedDates, dateStr, instance) => {
+                // Remove any existing event listeners to prevent duplicates
+                const input = instance.altInput;
+                input.removeEventListener('change', input._changeHandler);
+                
+                // Add new event listener for manual input
+                input._changeHandler = (e) => {
+                    const date = new Date(e.target.value);
+                    if (!isNaN(date.getTime())) {
+                        instance.setDate(date, true);
+                    }
+                };
+                input.addEventListener('change', input._changeHandler);
 
-                    data.forEach(entry => {
-                        let row = `<tr>
-                            <td>${entry.timestamp}</td>
-                            <td>${entry.ip}</td>
-                            ${entry.cpu !== undefined ? `<td>${entry.cpu}</td><td>${entry.memory}</td>` : ""}
-                            ${entry.pid !== undefined ? `<td>${entry.pid}</td><td>${entry.name}</td><td>${entry.user}</td>` : ""}
-                        </tr>`;
-                        tableBody.innerHTML += row;
-                    });
-                })
-                .catch(error => console.error("Error fetching data:", error));
+                // Initialize with default value if exists
+                if (selectedDates.length > 0) {
+                    input.classList.add('has-value');
+                    // Ensure the input value is properly formatted
+                    input.value = instance.formatDate(selectedDates[0], instance.config.altFormat);
+                }
+            },
+            onClose: (selectedDates, dateStr, instance) => {
+                const input = instance.altInput;
+                if (selectedDates.length > 0) {
+                    input.classList.add('has-value');
+                    // Ensure the input value is properly formatted
+                    input.value = instance.formatDate(selectedDates[0], instance.config.altFormat);
+                    refreshAllData();
+                }
+            },
+            onChange: (selectedDates, dateStr, instance) => {
+                const input = instance.altInput;
+                if (selectedDates.length > 0) {
+                    input.classList.add('has-value');
+                    // Ensure the input value is properly formatted
+                    input.value = instance.formatDate(selectedDates[0], instance.config.altFormat);
+                } else {
+                    input.classList.remove('has-value');
+                }
+            }
+        };
+
+        const startPicker = flatpickr("#startTime", {
+            ...flatpickrConfig,
+            defaultDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+            placeholder: "Select start date & time"
+        });
+
+        const endPicker = flatpickr("#endTime", {
+            ...flatpickrConfig,
+            defaultDate: new Date(),
+            placeholder: "Select end date & time"
+        });
+
+        // Initialize the has-value class for inputs with default dates
+        document.addEventListener('DOMContentLoaded', function() {
+            [startPicker, endPicker].forEach(picker => {
+                if (picker.selectedDates.length > 0) {
+                    const input = picker.altInput;
+                    input.classList.add('has-value');
+                    // Ensure the input value is properly formatted
+                    input.value = picker.formatDate(picker.selectedDates[0], picker.config.altFormat);
+                }
+            });
+        });
+
+        // Initialize Charts with updated theme
+        let cpuChart, memoryChart;
+
+        function initializeCharts() {
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                        titleColor: '#c084fc',
+                        bodyColor: '#e2e8f0',
+                        borderColor: 'rgba(168, 85, 247, 0.2)',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: {
+                            color: 'rgba(75, 85, 99, 0.2)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#9CA3AF',
+                            padding: 10,
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(75, 85, 99, 0.2)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#9CA3AF',
+                            padding: 10,
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                elements: {
+                    line: {
+                        tension: 0.4,
+                        borderWidth: 2
+                    },
+                    point: {
+                        radius: 0,
+                        hoverRadius: 6,
+                        hitRadius: 6
+                    }
+                }
+            };
+
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            cpuChart = new Chart(cpuCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'CPU Usage',
+                        data: [],
+                        borderColor: '#A855F7',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        fill: true,
+                        cubicInterpolationMode: 'monotone'
+                    }]
+                },
+                options: chartOptions
+            });
+
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            memoryChart = new Chart(memoryCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Memory Usage',
+                        data: [],
+                        borderColor: '#C084FC',
+                        backgroundColor: 'rgba(192, 132, 252, 0.1)',
+                        fill: true,
+                        cubicInterpolationMode: 'monotone'
+                    }]
+                },
+                options: chartOptions
+            });
         }
 
+        // Initialize grid APIs
+        let systemGridApi, newProcessesGridApi, privilegedGridApi;
+
+        // Initialize Grids with updated theme
+        function initializeGrids() {
+            const defaultColDef = {
+                sortable: true,
+                filter: true,
+                resizable: true,
+                suppressMovable: true,
+                flex: 1,
+                minWidth: 100
+            };
+
+            // System Stats Grid
+            const systemGridElement = document.querySelector('#systemGrid');
+            if (systemGridElement) {
+                const systemGridOptions = {
+                    columnDefs: [
+                        { field: 'timestamp', headerName: 'Timestamp', sort: 'desc', flex: 1.5 },
+                        { field: 'ip', headerName: 'IP', flex: 1 },
+                        { 
+                            field: 'cpu', 
+                            headerName: 'CPU Usage (%)', 
+                            type: 'numericColumn',
+                            cellStyle: params => ({
+                                color: params.value > 80 ? '#EF4444' : params.value > 50 ? '#F59E0B' : '#10B981'
+                            })
+                        },
+                        { 
+                            field: 'memory', 
+                            headerName: 'Memory Usage (%)', 
+                            type: 'numericColumn',
+                            cellStyle: params => ({
+                                color: params.value > 80 ? '#EF4444' : params.value > 50 ? '#F59E0B' : '#10B981'
+                            })
+                        }
+                    ],
+                    defaultColDef,
+                    rowData: []
+                };
+                const systemGrid = new agGrid.Grid(systemGridElement, systemGridOptions);
+                systemGridApi = systemGrid.gridOptions.api;
+            }
+
+            // New Processes Grid
+            const newProcessesGridElement = document.querySelector('#newProcessesGrid');
+            if (newProcessesGridElement) {
+                const newProcessesGridOptions = {
+                    columnDefs: [
+                        { field: 'timestamp', headerName: 'Timestamp', sort: 'desc', flex: 1.5 },
+                        { field: 'ip', headerName: 'IP', flex: 1 },
+                        { field: 'pid', headerName: 'PID', type: 'numericColumn', flex: 0.8 },
+                        { field: 'name', headerName: 'Name', flex: 1.5 },
+                        { field: 'user', headerName: 'User', flex: 1 }
+                    ],
+                    defaultColDef,
+                    rowData: []
+                };
+                const newProcessesGrid = new agGrid.Grid(newProcessesGridElement, newProcessesGridOptions);
+                newProcessesGridApi = newProcessesGrid.gridOptions.api;
+            }
+
+            // Privileged Processes Grid
+            const privilegedGridElement = document.querySelector('#privilegedGrid');
+            if (privilegedGridElement) {
+                const privilegedGridOptions = {
+                    columnDefs: [
+                        { field: 'timestamp', headerName: 'Timestamp', sort: 'desc', flex: 1.5 },
+                        { field: 'ip', headerName: 'IP', flex: 1 },
+                        { field: 'pid', headerName: 'PID', type: 'numericColumn', flex: 0.8 },
+                        { field: 'name', headerName: 'Name', flex: 1.5 },
+                        { field: 'user', headerName: 'User', flex: 1 }
+                    ],
+                    defaultColDef,
+                    rowData: []
+                };
+                const privilegedGrid = new agGrid.Grid(privilegedGridElement, privilegedGridOptions);
+                privilegedGridApi = privilegedGrid.gridOptions.api;
+            }
+        }
+
+        // Simplified showTab function
         function showTab(tab) {
-            document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
-            document.getElementById(tab).classList.add('active');
+            // Store the active tab in localStorage
+            localStorage.setItem('activeTab', tab);
+
+            // Update active state on buttons with smooth transition
+            document.querySelectorAll('.nav-button').forEach(el => {
+                // Remove active class with transition
+                if (el.classList.contains('active')) {
+                    el.style.transition = 'all 0.2s ease-in-out';
+                    el.classList.remove('active');
+                }
+            });
+
+            // Add active class to selected tab
+            const activeTab = document.getElementById(`${tab}-tab`);
+            activeTab.classList.add('active');
+
+            // Update content visibility with fade effect
+            document.querySelectorAll('.content').forEach(el => {
+                if (el.id === tab) {
+                    el.classList.remove('hidden');
+                    // Force a reflow before removing opacity
+                    el.offsetHeight;
+                    el.classList.remove('opacity-0');
+                    el.style.transition = 'opacity 0.2s ease-in-out';
+                } else {
+                    el.classList.add('opacity-0');
+                    el.style.transition = 'opacity 0.2s ease-in-out';
+                    setTimeout(() => el.classList.add('hidden'), 200);
+                }
+            });
+
+            // Ensure the active tab is visible in the scroll view on mobile
+            if (window.innerWidth <= 640) {
+                activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
         }
 
-        // Refresh data every 5 seconds
-        setInterval(() => {
-            fetchStats('/api/system_stats', 'system-table-body');
-            fetchStats('/api/new_processes', 'new-table-body');
-            fetchStats('/api/privileged_processes', 'privileged-table-body');
-        }, 5000);
+        function getTimeRange() {
+            return {
+                start: startPicker.selectedDates[0]?.toISOString() || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                end: endPicker.selectedDates[0]?.toISOString() || new Date().toISOString()
+            };
+        }
 
-        // Initial data load
-        fetchStats('/api/system_stats', 'system-table-body');
-        fetchStats('/api/new_processes', 'new-table-body');
-        fetchStats('/api/privileged_processes', 'privileged-table-body');
+        function setTimeRange(range) {
+            const now = new Date();
+            let start;
+            
+            switch(range) {
+                case '24h':
+                    start = new Date(now - 24 * 60 * 60 * 1000);
+                    break;
+                case '7d':
+                    start = new Date(now - 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case '30d':
+                    start = new Date(now - 30 * 24 * 60 * 60 * 1000);
+                    break;
+            }
+            
+            startPicker.setDate(start);
+            endPicker.setDate(now);
+            refreshAllData();
+        }
+
+        async function fetchStats(endpoint, gridId) {
+            const timeRange = getTimeRange();
+            const queryParams = new URLSearchParams({
+                start: timeRange.start,
+                end: timeRange.end
+            });
+
+            try {
+                const response = await fetch(`${endpoint}?${queryParams.toString()}`);
+                const data = await response.json();
+                
+                // Update grid data
+                const gridApi = gridId === 'system' ? systemGridApi : 
+                               gridId === 'new' ? newProcessesGridApi : 
+                               privilegedGridApi;
+
+                if (!gridApi) {
+                    console.error(`Grid API for ${gridId} is not initialized yet. Skipping fetch.`);
+                    return;
+                }
+
+                gridApi.setRowData(data);
+
+                // Update charts if system stats
+                if (gridId === 'system') {
+                    updateCharts(data);
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        function updateCharts(data) {
+            const timestamps = data.map(entry => new Date(entry.timestamp).toLocaleTimeString());
+            const cpuData = data.map(entry => entry.cpu);
+            const memoryData = data.map(entry => entry.memory);
+
+            // Update CPU chart
+            cpuChart.data.labels = timestamps;
+            cpuChart.data.datasets[0].data = cpuData;
+            document.querySelector('#cpuChart').closest('.chart-container').querySelector('.chart-empty').classList.toggle('hidden', cpuData.length > 0);
+            cpuChart.update();
+
+            // Update Memory chart
+            memoryChart.data.labels = timestamps;
+            memoryChart.data.datasets[0].data = memoryData;
+            document.querySelector('#memoryChart').closest('.chart-container').querySelector('.chart-empty').classList.toggle('hidden', memoryData.length > 0);
+            memoryChart.update();
+        }
+
+        async function refreshAllData() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('loading', 'opacity-75');
+
+            try {
+                await Promise.all([
+                    fetchStats('/api/system_stats', 'system'),
+                    fetchStats('/api/new_processes', 'new'),
+                    fetchStats('/api/privileged_processes', 'privileged')
+                ]);
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.classList.remove('loading', 'opacity-75');
+            }
+        }
+
+        // Initialize components and restore active tab
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            initializeGrids();
+            
+            // Verify grid APIs are initialized
+            if (!systemGridApi || !newProcessesGridApi || !privilegedGridApi) {
+                console.error("One or more grid APIs failed to initialize.");
+                return;
+            }
+            
+            // Restore the active tab from localStorage or default to 'system'
+            const activeTab = localStorage.getItem('activeTab') || 'system';
+            showTab(activeTab);
+            
+            refreshAllData();
+
+            // Add touch feedback for mobile devices
+            document.querySelectorAll('.nav-button').forEach(button => {
+                button.addEventListener('touchstart', () => {
+                    button.style.transition = 'background-color 0.2s ease-in-out';
+                });
+            });
+
+            // Handle scroll indicators for mobile navigation
+            const navMenu = document.querySelector('.nav-menu');
+            if (navMenu) {
+                const checkScroll = () => {
+                    const isStart = navMenu.scrollLeft > 20;
+                    const isEnd = navMenu.scrollLeft < (navMenu.scrollWidth - navMenu.clientWidth - 20);
+                    
+                    navMenu.classList.toggle('scroll-start', isStart);
+                    navMenu.classList.toggle('scroll-end', isEnd);
+                };
+
+                navMenu.addEventListener('scroll', checkScroll);
+                window.addEventListener('resize', checkScroll);
+                
+                // Initial check
+                checkScroll();
+            }
+
+            // Handle tab visibility on mobile
+            const ensureTabVisible = (tabId) => {
+                if (window.innerWidth <= 768) {
+                    const tab = document.getElementById(tabId);
+                    if (tab) {
+                        const navMenu = tab.closest('.nav-menu');
+                        if (navMenu) {
+                            const tabRect = tab.getBoundingClientRect();
+                            const menuRect = navMenu.getBoundingClientRect();
+                            
+                            if (tabRect.left < menuRect.left || tabRect.right > menuRect.right) {
+                                tab.scrollIntoView({
+                                    behavior: 'smooth',
+                                    block: 'nearest',
+                                    inline: 'center'
+                                });
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Update showTab function to ensure tab visibility
+            const originalShowTab = showTab;
+            showTab = (tab) => {
+                originalShowTab(tab);
+                ensureTabVisible(`${tab}-tab`);
+            };
+        });
     </script>
 </body>
 </html>
