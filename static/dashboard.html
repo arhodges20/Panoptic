@@ -167,6 +167,41 @@
             overflow: hidden;
             margin-top: 20px;
         }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .pagination-btn {
+            padding: 8px 16px;
+            background: none;
+            border: 1px solid var(--text-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            color: var(--text-secondary);
+        }
+
+        .page-size-select {
+            padding: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -201,6 +236,14 @@
             </div>
 
             <div class="data-table">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                    <select class="page-size-select" id="statsPageSize">
+                        <option value="10">10 per page</option>
+                        <option value="25">25 per page</option>
+                        <option value="50">50 per page</option>
+                        <option value="100">100 per page</option>
+                    </select>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -213,11 +256,24 @@
                     <tbody id="statsTable">
                     </tbody>
                 </table>
+                <div class="pagination-controls" id="statsPagination">
+                    <button class="pagination-btn" id="statsPrevPage">← Previous</button>
+                    <span class="pagination-info">Page <span id="statsCurrentPage">1</span></span>
+                    <button class="pagination-btn" id="statsNextPage">Next →</button>
+                </div>
             </div>
         </div>
 
         <div id="new-processes" class="tab-content">
             <div class="process-table">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                    <select class="page-size-select" id="newProcessesPageSize">
+                        <option value="10">10 per page</option>
+                        <option value="25">25 per page</option>
+                        <option value="50">50 per page</option>
+                        <option value="100">100 per page</option>
+                    </select>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -231,11 +287,24 @@
                     <tbody id="newProcessesTable">
                     </tbody>
                 </table>
+                <div class="pagination-controls" id="newProcessesPagination">
+                    <button class="pagination-btn" id="newProcessesPrevPage">← Previous</button>
+                    <span class="pagination-info">Page <span id="newProcessesCurrentPage">1</span></span>
+                    <button class="pagination-btn" id="newProcessesNextPage">Next →</button>
+                </div>
             </div>
         </div>
 
         <div id="privileged-processes" class="tab-content">
             <div class="process-table">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                    <select class="page-size-select" id="privilegedProcessesPageSize">
+                        <option value="10">10 per page</option>
+                        <option value="25">25 per page</option>
+                        <option value="50">50 per page</option>
+                        <option value="100">100 per page</option>
+                    </select>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -249,6 +318,11 @@
                     <tbody id="privilegedProcessesTable">
                     </tbody>
                 </table>
+                <div class="pagination-controls" id="privilegedProcessesPagination">
+                    <button class="pagination-btn" id="privilegedProcessesPrevPage">← Previous</button>
+                    <span class="pagination-info">Page <span id="privilegedProcessesCurrentPage">1</span></span>
+                    <button class="pagination-btn" id="privilegedProcessesNextPage">Next →</button>
+                </div>
             </div>
         </div>
     </div>
@@ -380,17 +454,46 @@
             });
         }
 
-        // Table updates
+        // Pagination state
+        const paginationState = {
+            systemStats: { currentPage: 1, data: [] },
+            newProcesses: { currentPage: 1, data: [] },
+            privilegedProcesses: { currentPage: 1, data: [] }
+        };
+
+        function getPageSize(tableId) {
+            const pageSizeSelect = document.getElementById(`${tableId}PageSize`);
+            return parseInt(pageSizeSelect.value);
+        }
+
+        function updatePaginationControls(type, data) {
+            const state = paginationState[type];
+            const pageSize = getPageSize(type);
+            const totalPages = Math.ceil(data.length / pageSize);
+            
+            const prevBtn = document.getElementById(`${type}PrevPage`);
+            const nextBtn = document.getElementById(`${type}NextPage`);
+            const currentPageSpan = document.getElementById(`${type}CurrentPage`);
+            
+            prevBtn.disabled = state.currentPage === 1;
+            nextBtn.disabled = state.currentPage === totalPages;
+            currentPageSpan.textContent = `${state.currentPage} of ${totalPages}`;
+        }
+
+        // Modified table update functions
         function updateSystemStatsTable(data) {
+            paginationState.systemStats.data = [...data].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+            
+            const pageSize = getPageSize('stats');
+            const startIdx = (paginationState.systemStats.currentPage - 1) * pageSize;
+            const pageData = paginationState.systemStats.data.slice(startIdx, startIdx + pageSize);
+            
             const tbody = document.getElementById('statsTable');
             tbody.innerHTML = '';
 
-            // Sort data by timestamp in descending order
-            const sortedData = [...data].sort((a, b) => 
-                new Date(b.timestamp) - new Date(a.timestamp)
-            );
-
-            sortedData.slice(0, 10).forEach(row => {
+            pageData.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${formatDate(row.timestamp)}</td>
@@ -400,18 +503,24 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            updatePaginationControls('systemStats', data);
         }
 
         function updateProcessTable(tableId, data) {
+            const type = tableId.replace('Table', '');
+            paginationState[type].data = [...data].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+            
+            const pageSize = getPageSize(type);
+            const startIdx = (paginationState[type].currentPage - 1) * pageSize;
+            const pageData = paginationState[type].data.slice(startIdx, startIdx + pageSize);
+            
             const tbody = document.getElementById(tableId);
             tbody.innerHTML = '';
 
-            // Sort data by timestamp in descending order
-            const sortedData = [...data].sort((a, b) => 
-                new Date(b.timestamp) - new Date(a.timestamp)
-            );
-
-            sortedData.slice(0, 10).forEach(row => {
+            pageData.forEach(row => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${formatDate(row.timestamp)}</td>
@@ -422,6 +531,8 @@
                 `;
                 tbody.appendChild(tr);
             });
+
+            updatePaginationControls(type, data);
         }
 
         // Tab switching
@@ -506,6 +617,49 @@
                 e.target.classList.add('active');
                 // Refresh dashboard with new time range
                 refreshData();
+            });
+        });
+
+        // Add pagination event listeners
+        ['stats', 'newProcesses', 'privilegedProcesses'].forEach(type => {
+            // Previous page button
+            document.getElementById(`${type}PrevPage`).addEventListener('click', () => {
+                const state = paginationState[type === 'stats' ? 'systemStats' : type];
+                if (state.currentPage > 1) {
+                    state.currentPage--;
+                    if (type === 'stats') {
+                        updateSystemStatsTable(state.data);
+                    } else {
+                        updateProcessTable(`${type}Table`, state.data);
+                    }
+                }
+            });
+
+            // Next page button
+            document.getElementById(`${type}NextPage`).addEventListener('click', () => {
+                const state = paginationState[type === 'stats' ? 'systemStats' : type];
+                const pageSize = getPageSize(type);
+                const totalPages = Math.ceil(state.data.length / pageSize);
+                
+                if (state.currentPage < totalPages) {
+                    state.currentPage++;
+                    if (type === 'stats') {
+                        updateSystemStatsTable(state.data);
+                    } else {
+                        updateProcessTable(`${type}Table`, state.data);
+                    }
+                }
+            });
+
+            // Page size select
+            document.getElementById(`${type}PageSize`).addEventListener('change', () => {
+                const state = paginationState[type === 'stats' ? 'systemStats' : type];
+                state.currentPage = 1; // Reset to first page when changing page size
+                if (type === 'stats') {
+                    updateSystemStatsTable(state.data);
+                } else {
+                    updateProcessTable(`${type}Table`, state.data);
+                }
             });
         });
 
