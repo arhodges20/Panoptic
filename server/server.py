@@ -1,23 +1,106 @@
-        logging.warning("Received empty or invalid JSON data")
-        return jsonify({"error": "Invalid data"}), 400
+import sqlite3
+import logging
+from flask import Flask, request, jsonify
+from datetime import datetime
 
-    # Store system stats
-    if "cpu" in data and "memory" in data:
-        logging.info(f"Received system stats: {data}")
-        insert_log("system_stats", ["ip", "cpu", "memory"], [client_ip, data["cpu"], data["memory"]])
+app = Flask(__name__)
 
-    # Store new processes
-    if "new_processes" in data:
-        for process in data["new_processes"]:
-            logging.info(f"New process detected: {process}")
-            insert_log("new_processes", ["ip", "pid", "name", "user"], [client_ip, process["pid"], process["name"], process["u>
+DB_PATH = "logs.db"
 
-    # Store privileged processes
-    if "privileged_processes" in data and data["privileged_processes"]:                                                                for process in data["privileged_processes"]:
-            logging.warning(f"⚠ PRIVILEGED PROCESS DETECTED: {process}")
-            insert_log("privileged_processes", ["ip", "pid", "name", "user"], [client_ip, process["pid"], process["name"], pro>
+# Ensure tables exist
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            ip TEXT,
+            cpu REAL,
+            memory REAL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS new_processes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            ip TEXT,
+            pid INTEGER,
+            name TEXT,
+            user TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS privileged_processes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            ip TEXT,
+            pid INTEGER,
+            name TEXT,
+            user TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-    return jsonify({"status": "ok"}), 200
+init_db()  # Ensure DB tables exist on startup
+
+# Insert data into database
+def insert_log(table, columns, values):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    query = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(values))})"
+    cursor.execute(query, values)
+    conn.commit()
+    conn.close()
+
+@app.route("/api/system_stats", methods=["GET"])
+def get_system_stats():
+    start = request.args.get("start")
+    end = request.args.get("end")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    query = "SELECT timestamp, ip, cpu, memory FROM system_stats WHERE timestamp BETWEEN ? AND ?"
+    cursor.execute(query, (start, end))
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([{"timestamp": row[0], "ip": row[1], "cpu": row[2], "memory": row[3]} for row in rows])
+
+@app.route("/api/new_processes", methods=["GET"])
+def get_new_processes():
+    start = request.args.get("start")
+    end = request.args.get("end")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    query = "SELECT timestamp, ip, pid, name, user FROM new_processes WHERE timestamp BETWEEN ? AND ?"
+    cursor.execute(query, (start, end))
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([{"timestamp": row[0], "ip": row[1], "pid": row[2], "name": row[3], "user": row[4]} for row in rows])
+
+@app.route("/api/privileged_processes", methods=["GET"])
+def get_privileged_processes():
+    start = request.args.get("start")
+    end = request.args.get("end")
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    query = "SELECT timestamp, ip, pid, name, user FROM privileged_processes WHERE timestamp BETWEEN ? AND ?"
+    cursor.execute(query, (start, end))
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify([{"timestamp": row[0], "ip": row[1], "pid": row[2], "name": row[3], "user": row[4]} for row in rows])
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
