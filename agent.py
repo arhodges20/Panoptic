@@ -11,7 +11,7 @@ logging.basicConfig(
 )
 
 # Server configuration
-SERVER_URL = "http://localhost:5000"
+SERVER_URL = "http://10.10.50.4:5000"
 
 def get_system_stats():
     """Collect system statistics."""
@@ -58,8 +58,8 @@ def get_privileged_processes():
                 pinfo = proc.info
                 # On Windows, check for admin processes
                 # On Unix-like systems, check for root processes
-                if (pinfo['username'] == 'SYSTEM' or 
-                    pinfo['username'] == 'root' or 
+                if (pinfo['username'] == 'SYSTEM' or
+                    pinfo['username'] == 'root' or
                     pinfo['username'].endswith('Administrator')):
                     privileged.append({
                         "pid": pinfo['pid'],
@@ -86,7 +86,7 @@ def send_data_to_server(data):
 
 def main():
     logging.info("Starting Panoptic Agent...")
-    
+
     while True:
         try:
             # Collect all data
@@ -102,10 +102,10 @@ def main():
                     "privileged_processes": priv_procs
                 }
                 send_data_to_server(data)
-            
+
             # Wait for 10 seconds before next collection
             time.sleep(10)
-            
+
         except KeyboardInterrupt:
             logging.info("Stopping Panoptic Agent...")
             break

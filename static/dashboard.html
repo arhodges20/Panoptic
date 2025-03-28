@@ -470,11 +470,11 @@
             const state = paginationState[type];
             const pageSize = getPageSize(type);
             const totalPages = Math.ceil(data.length / pageSize);
-            
+
             const prevBtn = document.getElementById(`${type}PrevPage`);
             const nextBtn = document.getElementById(`${type}NextPage`);
             const currentPageSpan = document.getElementById(`${type}CurrentPage`);
-            
+
             prevBtn.disabled = state.currentPage === 1;
             nextBtn.disabled = state.currentPage === totalPages;
             currentPageSpan.textContent = `${state.currentPage} of ${totalPages}`;
@@ -482,14 +482,14 @@
 
         // Modified table update functions
         function updateSystemStatsTable(data) {
-            paginationState.systemStats.data = [...data].sort((a, b) => 
+            paginationState.systemStats.data = [...data].sort((a, b) =>
                 new Date(b.timestamp) - new Date(a.timestamp)
             );
-            
+
             const pageSize = getPageSize('stats');
             const startIdx = (paginationState.systemStats.currentPage - 1) * pageSize;
             const pageData = paginationState.systemStats.data.slice(startIdx, startIdx + pageSize);
-            
+
             const tbody = document.getElementById('statsTable');
             tbody.innerHTML = '';
 
@@ -509,14 +509,14 @@
 
         function updateProcessTable(tableId, data) {
             const type = tableId.replace('Table', '');
-            paginationState[type].data = [...data].sort((a, b) => 
+            paginationState[type].data = [...data].sort((a, b) =>
                 new Date(b.timestamp) - new Date(a.timestamp)
             );
-            
+
             const pageSize = getPageSize(type);
             const startIdx = (paginationState[type].currentPage - 1) * pageSize;
             const pageData = paginationState[type].data.slice(startIdx, startIdx + pageSize);
-            
+
             const tbody = document.getElementById(tableId);
             tbody.innerHTML = '';
 
@@ -541,15 +541,15 @@
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Remove active class from all tabs
             document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Show selected tab content
             document.getElementById(tabId).classList.add('active');
-            
+
             // Add active class to selected tab
             document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
         }
@@ -571,7 +571,7 @@
             try {
                 // Get active tab
                 const activeTab = document.querySelector('.nav-tab.active').dataset.tab;
-                
+
                 // Fetch and update data based on active tab
                 switch (activeTab) {
                     case 'system-stats':
@@ -598,7 +598,7 @@
 
         // Event listeners
         document.querySelector('.refresh-btn').addEventListener('click', refreshData);
-        
+
         // Add tab switching listeners
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -640,7 +640,7 @@
                 const state = paginationState[type === 'stats' ? 'systemStats' : type];
                 const pageSize = getPageSize(type);
                 const totalPages = Math.ceil(state.data.length / pageSize);
-                
+
                 if (state.currentPage < totalPages) {
                     state.currentPage++;
                     if (type === 'stats') {
@@ -667,4 +667,4 @@
         initDashboard();
     </script>
 </body>
-</html> 
+</html>
