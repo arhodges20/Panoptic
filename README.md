@@ -1,24 +1,44 @@
 # Panoptic
-Panoptic: Lightweight Endpoint Monitoring PoC 
 
-Panoptic is a proof of concept (PoC) for a lightweight, centralized endpoint monitoring solution inspired by the idea of a digital panopticon—a single-pane control tower for managing and securing an organization’s endpoints.
-Current Features in Progress
+A real-time system monitoring solution with a web dashboard that tracks system statistics and process information. Features secure authentication through Keycloak.
 
-    Endpoint Agent: Collects system metrics (CPU and memory usage) and transmits them to a central server.
-    Centralized Server:
-        Receives and stores data from agents.
-        Provides a basic API for querying system stats.
-    Simple CLI: Command-line interface for interacting with the server and agents.
+## Overview
 
-Planned Features
+This project consists of three main components:
 
-    Advanced metrics (e.g., disk usage, network activity).
-    Agent command execution (e.g., quarantine, process termination).
-    Real-time data visualization.
-    Web-based GUI for enhanced usability.
+1. **Monitoring Agent (Python)**
+   - Collects system metrics (CPU, memory usage)
+   - Tracks new process creation
+   - Detects privileged process execution
+   - Sends data to central server
 
-Goals
+2. **Backend Server (Flask/Python)**
+   - Receives and stores monitoring data
+   - Provides API endpoints for data access
+   - Integrates with Keycloak for authentication
+   - Uses SQLite for data storage
 
-    Demonstrate the feasibility of a lightweight, modular endpoint monitoring system.
-    Serve as a learning platform for cybersecurity and system monitoring concepts.
-    Provide a foundation for building more advanced monitoring and response tools.
+3. **Web Dashboard**
+   - Displays real-time system metrics
+   - Shows process information in sortable grids
+   - Visualizes data with interactive charts
+   - Allows filtering by date/time ranges
+
+## Features
+
+- **System Monitoring**
+  - Real-time CPU and memory usage tracking
+  - New process detection
+  - Privileged process alerts
+  - Historical data storage
+
+- **Data Visualization**
+  - Interactive charts for system metrics
+  - Sortable and filterable data grids
+  - Custom date range selection
+  - Real-time updates
+
+- **Security**
+  - Keycloak authentication
+  - Secure API endpoints
+  - Session management
