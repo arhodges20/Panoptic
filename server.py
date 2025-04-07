@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
+from flask import Flask, request, jsonify, send_from_directory, redirect, make_response, url_for
 import sqlite3
 import logging
 from datetime import datetime, timedelta
@@ -7,21 +7,13 @@ from flask_cors import CORS
 import jwt
 import bcrypt
 from functools import wraps
-
-app = Flask(__name__, static_folder='static')
-CORS(app, supports_credentials=True)  # Enable CORS with credentials support
-
-# Configure logging and add secret key
-logging.basicConfig(level=logging.INFO)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')  # In production, use environment variable
+from flask_session import Session
 
 # Database path
 DB_PATH = "logs.db"
 
-# Ensure static directory exists
-os.makedirs('static', exist_ok=True)
-
 def init_db():
+    """Initialize the database and create tables"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -75,6 +67,34 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Create Flask application
+app = Flask(__name__, 
+    static_folder='static',  # Set static folder
+    static_url_path=''      # Empty string for serving from root
+)
+
+# Enable CORS
+CORS(app, supports_credentials=True)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+# Configure app
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
+Session(app)
+
+# Ensure static directory exists
+os.makedirs('static', exist_ok=True)
+
+# Initialize database
+try:
+    init_db()
+    logging.info("Database initialized successfully")
+except Exception as e:
+    logging.error(f"Error initializing database: {str(e)}")
+
 # Insert data into database
 def insert_log(table, columns, values):
     conn = sqlite3.connect(DB_PATH)
@@ -89,12 +109,20 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = None
 
-        # Check for token in cookies
-        token = request.cookies.get('token')
-        logging.info(f"Checking token in request. Token present: {token is not None}")
+        # Check for token in Authorization header
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'message': 'Invalid token format'}), 401
+
+        # Check for token in cookies if not in header
+        if not token:
+            token = request.cookies.get('token')
 
         if not token:
-            logging.warning("No token found in request cookies")
+            logging.warning("No token found in request")
             return jsonify({'message': 'Token is missing'}), 401
 
         try:
@@ -124,59 +152,117 @@ def token_required(f):
 
     return decorated
 
-@app.route("/api/login", methods=["POST"])
-def login():
-    auth = request.get_json()
-
-    if not auth or not auth.get('username') or not auth.get('password'):
-        return jsonify({'message': 'Missing credentials'}), 401
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute('SELECT * FROM users WHERE username = ?', (auth.get('username'),))
-    user = cursor.fetchone()
-    conn.close()
-
-    if not user or not bcrypt.checkpw(auth.get('password').encode('utf-8'),
-                                     user[2].encode('utf-8')):
-        return jsonify({'message': 'Invalid credentials'}), 401
-
-    # Generate token
-    token = jwt.encode({
-        'username': user[1],
-        'exp': datetime.utcnow() + timedelta(days=1 if auth.get('remember', False) else 1)
-    }, app.config['SECRET_KEY'])
-
-    logging.info(f"Login successful for user: {user[1]}")
-
-    response = make_response(jsonify({'message': 'Login successful'}))
-    response.set_cookie('token', token,
-                       httponly=True,
-                       secure=False,  # Disabled for development
-                       samesite=None,  # Disabled for development
-                       max_age=86400 * (30 if auth.get('remember', False) else 1))  # 30 days or 1 day
-
-    return response
-
-@app.route("/api/logout")
-def logout():
-    response = make_response(redirect('/login'))
-    response.delete_cookie('token')
-    return response
-
-@app.route("/")
+# Basic routes
+@app.route('/')
 def index():
     return redirect('/login')
 
-@app.route("/login")
+@app.route('/login')
 def login_page():
-    return send_from_directory(app.static_folder, 'login.html')
+    return send_from_directory('static', 'login.html')
 
-@app.route("/dashboard")
+@app.route('/dashboard')
 @token_required
-def dashboard():
-    return send_from_directory(app.static_folder, 'dashboard.html')
+def dashboard_page():
+    try:
+        logging.info("Attempting to serve dashboard.html")
+        response = make_response(send_from_directory('static', 'dashboard.html'))
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
+    except Exception as e:
+        logging.error(f"Error serving dashboard: {str(e)}")
+        return jsonify({'message': 'Error loading dashboard'}), 500
+
+# Serve static files
+@app.route('/<path:filename>')
+def serve_static(filename):
+    try:
+        if filename == 'dashboard.html':
+            return redirect('/dashboard')
+        logging.info(f"Attempting to serve static file: {filename}")
+        return send_from_directory('static', filename)
+    except Exception as e:
+        logging.error(f"Error serving static file {filename}: {str(e)}")
+        return jsonify({'message': 'File not found'}), 404
+
+# API routes
+@app.route("/api/login", methods=["POST"])
+def login():
+    try:
+        auth = request.get_json()
+        logging.info("Login attempt received")
+
+        if not auth:
+            logging.warning("No JSON data in login request")
+            return jsonify({'message': 'Missing credentials - No JSON data'}), 401
+
+        if not auth.get('username'):
+            logging.warning("Missing username in login request")
+            return jsonify({'message': 'Missing username'}), 401
+
+        if not auth.get('password'):
+            logging.warning("Missing password in login request")
+            return jsonify({'message': 'Missing password'}), 401
+
+        logging.info(f"Login attempt for username: {auth.get('username')}")
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM users WHERE username = ?', (auth.get('username'),))
+        user = cursor.fetchone()
+        conn.close()
+
+        if not user:
+            logging.warning(f"User not found: {auth.get('username')}")
+            return jsonify({'message': 'Invalid credentials'}), 401
+
+        if not bcrypt.checkpw(auth.get('password').encode('utf-8'),
+                            user[2].encode('utf-8')):
+            logging.warning(f"Invalid password for user: {auth.get('username')}")
+            return jsonify({'message': 'Invalid credentials'}), 401
+
+        # Generate token
+        token = jwt.encode({
+            'username': user[1],
+            'exp': datetime.utcnow() + timedelta(days=1 if auth.get('remember', False) else 1)
+        }, app.config['SECRET_KEY'])
+
+        logging.info(f"Login successful for user: {user[1]}")
+
+        response = make_response(jsonify({
+            'message': 'Login successful',
+            'token': token,
+            'username': user[1]
+        }))
+        
+        # Set cookie with token
+        response.set_cookie(
+            'token',
+            token,
+            httponly=True,
+            secure=False,  # Set to True in production
+            samesite=None,  # Set to 'Strict' in production
+            max_age=86400 * (30 if auth.get('remember', False) else 1)
+        )
+
+        return response
+
+    except sqlite3.Error as e:
+        logging.error(f"Database error during login: {str(e)}")
+        return jsonify({'message': 'Database error occurred'}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error during login: {str(e)}")
+        return jsonify({'message': 'An unexpected error occurred'}), 500
+
+@app.route("/api/logout", methods=['GET', 'POST'])
+@token_required
+def logout():
+    response = make_response(jsonify({'message': 'Logged out successfully'}))
+    response.delete_cookie('token')
+    return response
 
 @app.route("/api/logs", methods=["POST"])
 def receive_logs():
@@ -322,5 +408,4 @@ def get_privileged_processes():
     } for row in rows])
 
 if __name__ == "__main__":
-    init_db()  # Ensure DB tables exist on startup
     app.run(host="0.0.0.0", port=5000, debug=True)
