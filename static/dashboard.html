@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panoptic Dashboard</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
     <style>
         :root {
             --bg-primary: #1a1b26;
@@ -212,6 +212,7 @@
                 <button class="nav-tab active" data-tab="system-stats">🌐 System Stats</button>
                 <button class="nav-tab" data-tab="new-processes">🔄 New Processes</button>
                 <button class="nav-tab" data-tab="privileged-processes">🛡️ Privileged Processes</button>
+                <button class="nav-tab" id="logoutBtn" style="margin-left: auto;">🚪 Logout</button>
             </div>
         </header>
 
@@ -328,6 +329,51 @@
     </div>
 
     <script>
+        // Authentication check
+        function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+            return token;
+        }
+
+        // Add token to fetch requests
+        async function authenticatedFetch(url, options = {}) {
+            const token = checkAuth();
+            if (!token) return;
+
+            const headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+            };
+
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers,
+                    credentials: 'include'
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                    return;
+                }
+
+                return response;
+            } catch (error) {
+                console.error('Fetch error:', error);
+                throw error;
+            }
+        }
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+        });
+
         // Utility functions
         function formatDate(dateStr) {
             const date = new Date(dateStr);
@@ -364,12 +410,17 @@
             document.getElementById('time-range').textContent = `${start} to ${end}`;
         }
 
-        // Data fetching
+        // Update fetch functions to include auth headers
         async function fetchSystemStats() {
             try {
                 const range = getTimeRange();
-                const response = await fetch(`/api/system_stats?start=${range.start}&end=${range.end}`);
+                console.log('Fetching system stats...', range);
+                const response = await authenticatedFetch('/api/system_stats', {
+                    method: 'GET'
+                });
+
                 const data = await response.json();
+                console.log('System stats received:', data);
                 return data;
             } catch (error) {
                 console.error('Error fetching system stats:', error);
@@ -380,8 +431,13 @@
         async function fetchNewProcesses() {
             try {
                 const range = getTimeRange();
-                const response = await fetch(`/api/new_processes?start=${range.start}&end=${range.end}`);
+                console.log('Fetching new processes...', range);
+                const response = await authenticatedFetch('/api/new_processes', {
+                    method: 'GET'
+                });
+
                 const data = await response.json();
+                console.log('New processes received:', data);
                 return data;
             } catch (error) {
                 console.error('Error fetching new processes:', error);
@@ -392,8 +448,13 @@
         async function fetchPrivilegedProcesses() {
             try {
                 const range = getTimeRange();
-                const response = await fetch(`/api/privileged_processes?start=${range.start}&end=${range.end}`);
+                console.log('Fetching privileged processes...', range);
+                const response = await authenticatedFetch('/api/privileged_processes', {
+                    method: 'GET'
+                });
+
                 const data = await response.json();
+                console.log('Privileged processes received:', data);
                 return data;
             } catch (error) {
                 console.error('Error fetching privileged processes:', error);
@@ -403,13 +464,16 @@
 
         // Chart creation
         function createCharts(data) {
-            const timestamps = data.map(d => d.timestamp);
-            const cpuData = data.map(d => d.cpu);
-            const memoryData = data.map(d => d.memory);
+            // Sort data by timestamp in ascending order
+            const sortedData = [...data].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            const timestamps = sortedData.map(d => d.timestamp);
+            const cpuData = sortedData.map(d => d.cpu);
+            const memoryData = sortedData.map(d => d.memory);
 
             const cpuTrace = {
-                x: timestamps.reverse(),  // Reverse to show oldest to newest
-                y: cpuData.reverse(),
+                x: timestamps,
+                y: cpuData,
                 type: 'scatter',
                 fill: 'tozeroy',
                 name: 'CPU Usage',
@@ -434,24 +498,37 @@
                     gridcolor: '#24283b',
                     zerolinecolor: '#24283b',
                     type: 'date',
-                    tickformat: '%H:%M:%S\n%Y-%m-%d'
+                    tickformat: '%H:%M:%S\n%Y-%m-%d',
+                    rangeslider: {}
                 },
                 yaxis: {
                     gridcolor: '#24283b',
                     zerolinecolor: '#24283b',
-                    range: [0, 100]
+                    range: [0, 100],
+                    title: '%'
+                },
+                showlegend: true,
+                legend: {
+                    x: 0,
+                    y: 1.2
                 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToAdd: ['hoverClosestGl2d']
             };
 
             Plotly.newPlot('cpuChart', [cpuTrace], {
                 ...layout,
-                title: 'CPU Usage'
-            });
+                title: 'CPU Usage (%)'
+            }, config);
 
             Plotly.newPlot('memoryChart', [memoryTrace], {
                 ...layout,
-                title: 'Memory Usage'
-            });
+                title: 'Memory Usage (%)'
+            }, config);
         }
 
         // Pagination state
@@ -462,102 +539,146 @@
         };
 
         function getPageSize(tableId) {
-            const pageSizeSelect = document.getElementById(`${tableId}PageSize`);
-            return parseInt(pageSizeSelect.value);
+            try {
+                const pageSizeSelect = document.getElementById(`${tableId}PageSize`);
+                if (!pageSizeSelect) {
+                    console.warn(`Page size select not found for ${tableId}, using default of 10`);
+                    return 10;
+                }
+                return parseInt(pageSizeSelect.value);
+            } catch (error) {
+                console.warn('Error getting page size:', error);
+                return 10;
+            }
         }
 
         function updatePaginationControls(type, data) {
-            const state = paginationState[type];
-            const pageSize = getPageSize(type);
-            const totalPages = Math.ceil(data.length / pageSize);
-
-            const prevBtn = document.getElementById(`${type}PrevPage`);
-            const nextBtn = document.getElementById(`${type}NextPage`);
-            const currentPageSpan = document.getElementById(`${type}CurrentPage`);
-
-            prevBtn.disabled = state.currentPage === 1;
-            nextBtn.disabled = state.currentPage === totalPages;
-            currentPageSpan.textContent = `${state.currentPage} of ${totalPages}`;
+            try {
+                const state = paginationState[type];
+                const pageSize = getPageSize(type);
+                const totalPages = Math.ceil(data.length / pageSize) || 1;
+                
+                const prevBtn = document.getElementById(`${type}PrevPage`);
+                const nextBtn = document.getElementById(`${type}NextPage`);
+                const currentPageSpan = document.getElementById(`${type}CurrentPage`);
+                
+                if (prevBtn && nextBtn && currentPageSpan) {
+                    prevBtn.disabled = state.currentPage === 1;
+                    nextBtn.disabled = state.currentPage === totalPages;
+                    currentPageSpan.textContent = `${state.currentPage} of ${totalPages}`;
+                }
+            } catch (error) {
+                console.warn('Error updating pagination controls:', error);
+            }
         }
 
         // Modified table update functions
         function updateSystemStatsTable(data) {
-            paginationState.systemStats.data = [...data].sort((a, b) =>
-                new Date(b.timestamp) - new Date(a.timestamp)
-            );
+            try {
+                if (!data || !Array.isArray(data)) {
+                    console.warn('Invalid data received for system stats table');
+                    return;
+                }
 
-            const pageSize = getPageSize('stats');
-            const startIdx = (paginationState.systemStats.currentPage - 1) * pageSize;
-            const pageData = paginationState.systemStats.data.slice(startIdx, startIdx + pageSize);
+                paginationState.systemStats.data = [...data].sort((a, b) => 
+                    new Date(b.timestamp) - new Date(a.timestamp)
+                );
+                
+                const pageSize = getPageSize('stats');
+                const startIdx = (paginationState.systemStats.currentPage - 1) * pageSize;
+                const pageData = paginationState.systemStats.data.slice(startIdx, startIdx + pageSize);
+                
+                const tbody = document.getElementById('statsTable');
+                if (!tbody) {
+                    console.warn('Stats table body not found');
+                    return;
+                }
+                
+                tbody.innerHTML = '';
 
-            const tbody = document.getElementById('statsTable');
-            tbody.innerHTML = '';
+                pageData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${formatDate(row.timestamp)}</td>
+                        <td>${row.ip}</td>
+                        <td class="${row.cpu > 80 ? 'danger' : ''}">${row.cpu.toFixed(1)}%</td>
+                        <td class="${row.memory > 80 ? 'danger' : ''}">${row.memory.toFixed(1)}%</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
 
-            pageData.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${formatDate(row.timestamp)}</td>
-                    <td>${row.ip}</td>
-                    <td class="${row.cpu > 80 ? 'danger' : ''}">${row.cpu.toFixed(1)}%</td>
-                    <td class="${row.memory > 80 ? 'danger' : ''}">${row.memory.toFixed(1)}%</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            updatePaginationControls('systemStats', data);
+                updatePaginationControls('systemStats', data);
+            } catch (error) {
+                console.error('Error updating system stats table:', error);
+            }
         }
 
         function updateProcessTable(tableId, data) {
-            const type = tableId.replace('Table', '');
-            paginationState[type].data = [...data].sort((a, b) =>
-                new Date(b.timestamp) - new Date(a.timestamp)
-            );
+            try {
+                if (!data || !Array.isArray(data)) {
+                    console.warn(`Invalid data received for ${tableId}`);
+                    return;
+                }
 
-            const pageSize = getPageSize(type);
-            const startIdx = (paginationState[type].currentPage - 1) * pageSize;
-            const pageData = paginationState[type].data.slice(startIdx, startIdx + pageSize);
+                const type = tableId.replace('Table', '');
+                paginationState[type].data = [...data].sort((a, b) => 
+                    new Date(b.timestamp) - new Date(a.timestamp)
+                );
+                
+                const pageSize = getPageSize(type);
+                const startIdx = (paginationState[type].currentPage - 1) * pageSize;
+                const pageData = paginationState[type].data.slice(startIdx, startIdx + pageSize);
+                
+                const tbody = document.getElementById(tableId);
+                if (!tbody) {
+                    console.warn(`Table body not found for ${tableId}`);
+                    return;
+                }
+                
+                tbody.innerHTML = '';
 
-            const tbody = document.getElementById(tableId);
-            tbody.innerHTML = '';
+                pageData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${formatDate(row.timestamp)}</td>
+                        <td>${row.ip}</td>
+                        <td>${row.pid}</td>
+                        <td>${row.name}</td>
+                        <td>${row.user}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
 
-            pageData.forEach(row => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${formatDate(row.timestamp)}</td>
-                    <td>${row.ip}</td>
-                    <td>${row.pid}</td>
-                    <td>${row.name}</td>
-                    <td>${row.user}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-
-            updatePaginationControls(type, data);
+                updatePaginationControls(type, data);
+            } catch (error) {
+                console.error(`Error updating ${tableId}:`, error);
+            }
         }
 
         // Tab switching
         function switchTab(tabId) {
+            console.log(`Switching to tab: ${tabId}`);
             // Hide all tab contents
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-
+            
             // Remove active class from all tabs
             document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-
+            
             // Show selected tab content
             document.getElementById(tabId).classList.add('active');
-
+            
             // Add active class to selected tab
             document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-        }
-
-        // Initialize dashboard
-        async function initDashboard() {
-            updateTimeRange();
-            await refreshData();
+            
+            // Reset pagination state for the new tab
+            const type = tabId.replace('-', '');
+            if (paginationState[type]) {
+                paginationState[type].currentPage = 1;
+            }
         }
 
         // Refresh data based on current tab and time range
@@ -571,21 +692,37 @@
             try {
                 // Get active tab
                 const activeTab = document.querySelector('.nav-tab.active').dataset.tab;
-
+                console.log('Refreshing data for tab:', activeTab);
+                
                 // Fetch and update data based on active tab
                 switch (activeTab) {
                     case 'system-stats':
                         const statsData = await fetchSystemStats();
-                        createCharts(statsData);
-                        updateSystemStatsTable(statsData);
+                        if (statsData && Array.isArray(statsData)) {
+                            console.log('Updating system stats charts and table');
+                            createCharts(statsData);
+                            updateSystemStatsTable(statsData);
+                        } else {
+                            console.warn('Invalid system stats data received');
+                        }
                         break;
                     case 'new-processes':
                         const newProcesses = await fetchNewProcesses();
-                        updateProcessTable('newProcessesTable', newProcesses);
+                        if (newProcesses && Array.isArray(newProcesses)) {
+                            console.log('Updating new processes table');
+                            updateProcessTable('newProcessesTable', newProcesses);
+                        } else {
+                            console.warn('Invalid new processes data received');
+                        }
                         break;
                     case 'privileged-processes':
                         const privProcesses = await fetchPrivilegedProcesses();
-                        updateProcessTable('privilegedProcessesTable', privProcesses);
+                        if (privProcesses && Array.isArray(privProcesses)) {
+                            console.log('Updating privileged processes table');
+                            updateProcessTable('privilegedProcessesTable', privProcesses);
+                        } else {
+                            console.warn('Invalid privileged processes data received');
+                        }
                         break;
                 }
             } catch (error) {
@@ -596,9 +733,52 @@
             }
         }
 
+        // Initialize dashboard with error handling and reconnection logic
+        async function initDashboard() {
+            console.log('Initializing dashboard...');
+            updateTimeRange();
+            await refreshData();
+            console.log('Setting up automatic refresh...');
+            
+            let refreshInterval;
+            const INITIAL_REFRESH_INTERVAL = 10000; // 10 seconds
+
+            function setupRefreshInterval() {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                }
+
+                refreshInterval = setInterval(async () => {
+                    try {
+                        console.log('Auto-refresh triggered');
+                        await refreshData();
+                    } catch (error) {
+                        console.error('Error in refresh interval:', error);
+                    }
+                }, INITIAL_REFRESH_INTERVAL);
+            }
+
+            // Initial setup of refresh interval
+            setupRefreshInterval();
+
+            // Add visibility change handling
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('Page hidden, pausing refresh');
+                    if (refreshInterval) {
+                        clearInterval(refreshInterval);
+                    }
+                } else {
+                    console.log('Page visible, resuming refresh');
+                    refreshData();
+                    setupRefreshInterval();
+                }
+            });
+        }
+
         // Event listeners
         document.querySelector('.refresh-btn').addEventListener('click', refreshData);
-
+        
         // Add tab switching listeners
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
@@ -640,7 +820,7 @@
                 const state = paginationState[type === 'stats' ? 'systemStats' : type];
                 const pageSize = getPageSize(type);
                 const totalPages = Math.ceil(state.data.length / pageSize);
-
+                
                 if (state.currentPage < totalPages) {
                     state.currentPage++;
                     if (type === 'stats') {
@@ -663,8 +843,39 @@
             });
         });
 
-        // Initial load
-        initDashboard();
+        // Add logout functionality
+        async function handleLogout() {
+            try {
+                console.log('Logging out...');
+                const response = await authenticatedFetch('/api/logout', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                } else {
+                    console.error('Logout failed');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                localStorage.removeItem('authToken');
+                window.location.href = '/login';
+            }
+        }
+
+        // Add logout button event listener
+        document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Dashboard loaded, checking auth...');
+            if (!checkAuth()) {
+                return; // Will redirect to login if not authenticated
+            }
+            console.log('Auth check passed, initializing dashboard...');
+            initDashboard();
+        });
     </script>
 </body>
 </html>
